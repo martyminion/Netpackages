@@ -1,5 +1,5 @@
 [package]
-name = "Net-Packages"
+name = "net_packages"
 version = "0.1.0"
 authors = ["Martin Kimani"]
 edition = "2018"
