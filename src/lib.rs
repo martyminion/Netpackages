@@ -1,9 +1,14 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk:: collections::{UnorderedMap,Vector};
+use near_sdk:: {env,near_bindgen,AccountId};
+use near_sdk:: serde::{Deserialize,Serialize};
 
-use near_sdk::near_bindgen;
 
-#[derive(BorshDeserialize, BorshSerialize, Debug)]
-#[derive(PartialEq)]
+//This is a internet user subscription app
+// The customer chooses the preferred package; 
+//We are able to know when they paid and when the subscription will end.
+#[derive(BorshDeserialize, BorshSerialize, Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[serde(crate = "near_sdk::serde")]
 enum NetOptionsPackages {
     None,
     Bronze,
@@ -20,31 +25,44 @@ impl Default for NetOptionsPackages {
 
 
 #[near_bindgen]
-#[derive(Default, BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug)]
+#[serde(crate = "near_sdk::serde")]
 pub struct Customers {
+    account: AccountId,
     name: String,
     phone_number: String,
     house_number: String,
     net_option: NetOptionsPackages,
-    date_paid: String,
-    due_date: String,
+    date_paid: u64,
+    due_date: u64,
 }
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct NetOptions {
-    customers: Vec<Customers>,
+    packages: UnorderedMap<NetOptionsPackages,i64>,
+    customers: Vector<Customers>,
 }
 
 impl Default for NetOptions {
     fn default() -> Self {
-        NetOptions { customers: vec![] }
+        let mut package = UnorderedMap::new(b"p".to_vec());
+
+        package.insert(&NetOptionsPackages::Gold, &3000);
+        package.insert(&NetOptionsPackages::Silver, &2500);
+        package.insert(&NetOptionsPackages::Bronze, &2000);
+        
+        NetOptions { 
+            customers: Vector::new(b"r".to_vec()),
+            packages: package,
+    
+        }
     }
 }
 
 #[near_bindgen]
 impl NetOptions {
-    fn add_customer(
+    pub fn add_customer(
         &mut self,
         name: String,
         phone: String,
@@ -70,18 +88,19 @@ impl NetOptions {
         }
 
         let cs = Customers {
+            account: env::current_account_id(),
             name: name,
             phone_number: phone,
             house_number: house_number,
-            date_paid: start,
-            due_date: due,
+            date_paid: env::block_timestamp(),
+            due_date: env::block_timestamp() + 60*60*24*30,
             net_option: _option.unwrap(),
             
         };
-        self.customers.push(cs);
+        self.customers.push(&cs);
     }
-    fn all_customer(&self) -> Vec<&Customers> {
-        let mut tmp : Vec<&Customers> = vec![];
+    pub fn all_customer(&self) -> Vec<Customers> {
+        let mut tmp : Vec<Customers> = vec![];
 
         for item in self.customers.iter()  {
             tmp.push(item);
@@ -89,9 +108,9 @@ impl NetOptions {
         return tmp;
     }
 
-    fn get_customer(&self, phone: String) -> Option<&Customers> {
+    pub fn get_customer_by_phone(&self, phone: String) -> Option<Customers> {
 
-        let mut a_customer :Option<&Customers> = None;
+        let mut a_customer :Option<Customers> = None;
 
         for elem in self.customers.iter() {
             if elem.phone_number == phone{
@@ -102,12 +121,10 @@ impl NetOptions {
         return a_customer;
     }
 
-    fn update_customer(
+    pub fn update_customer_package(
         &mut self,
         phone: String,
         package: String,
-        date_paid: String,
-        date_due: String,
     ) {
 
         let _bronze = "bronze".to_string();
@@ -126,22 +143,34 @@ impl NetOptions {
             _option=Some(NetOptionsPackages::None)
         }
 
-        for customer in self.customers.iter_mut() {
+        let mut customer_index: Option<u64> = None;
+        for (index, customer) in self.customers.iter().enumerate() {
             if customer.phone_number == phone {
                
-                customer.date_paid = date_paid;
-                customer.due_date = date_due;
-
-
-              let x = _option.unwrap();
-
-                
-                customer.net_option = x;
+                customer_index = Some(index as u64);
                 
                 break;
             }
         }
+        match customer_index {
+            Some(c_index) => {
+    
+                let mut cust = self.customers.get(c_index).unwrap();
+    
+                let x = _option.unwrap();
+    
+                cust.net_option = x;
+    
+                self.customers.replace(c_index, &cust);
+            }
+    
+            None => {
+                env::panic_str("Customer does not exist")
+            }
+        }
     }
+    
+
 }
 
 /*
@@ -182,11 +211,11 @@ mod tests {
     
     app.add_customer("Joe".to_string(), "111".to_string(), "001".to_string(), "21/07/2022".to_string(), "21/08/2022".to_string(), "bronze".to_owned());
 //update Customer
-    app.update_customer("111".to_string(),"silver".to_string(),"23/06/2022".to_string(), "23/07/2022".to_string());
+    app.update_customer_package("111".to_string(),"silver".to_string());
 
 // get customer and check package
     
-let red = app.get_customer("111".to_owned());
+let red = app.get_customer_by_phone("111".to_owned());
 match red {
     Some(yell)=>{
         assert_eq!(yell.net_option,NetOptionsPackages::Silver)
