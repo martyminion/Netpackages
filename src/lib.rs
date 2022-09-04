@@ -9,6 +9,7 @@ use near_sdk:: serde::{Deserialize,Serialize};
 //We are able to know when they paid and when the subscription will end.
 #[derive(BorshDeserialize, BorshSerialize, Debug, PartialEq, Serialize, Deserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
+//We describe the packages
 enum NetOptionsPackages {
     None,
     Bronze,
@@ -27,6 +28,7 @@ impl Default for NetOptionsPackages {
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug)]
 #[serde(crate = "near_sdk::serde")]
+//We define the characteristics of each customer, required information
 pub struct Customers {
     account: AccountId,
     name: String,
@@ -48,6 +50,7 @@ impl Default for NetOptions {
     fn default() -> Self {
         let mut package = UnorderedMap::new(b"p".to_vec());
 
+        //We set the pricess for each package
         package.insert(&NetOptionsPackages::Gold, &3000);
         package.insert(&NetOptionsPackages::Silver, &2500);
         package.insert(&NetOptionsPackages::Bronze, &2000);
@@ -62,13 +65,12 @@ impl Default for NetOptions {
 
 #[near_bindgen]
 impl NetOptions {
+    //Function to add a new customer
     pub fn add_customer(
         &mut self,
         name: String,
         phone: String,
         house_number: String,
-        start: String,
-        due: String,
         package: String,
     ) {
         let _bronze = "bronze".to_string();
@@ -87,6 +89,7 @@ impl NetOptions {
             _option=Some(NetOptionsPackages::None)
         }
 
+
         let cs = Customers {
             account: env::current_account_id(),
             name: name,
@@ -99,6 +102,7 @@ impl NetOptions {
         };
         self.customers.push(&cs);
     }
+    //Function to retrieve all customer information
     pub fn all_customer(&self) -> Vec<Customers> {
         let mut tmp : Vec<Customers> = vec![];
 
@@ -107,7 +111,7 @@ impl NetOptions {
         }
         return tmp;
     }
-
+    //Function to  retrieve an individual customer
     pub fn get_customer_by_phone(&self, phone: String) -> Option<Customers> {
 
         let mut a_customer :Option<Customers> = None;
@@ -120,7 +124,7 @@ impl NetOptions {
 
         return a_customer;
     }
-
+    //Function to update cutomer package, when customer is changing packages
     pub fn update_customer_package(
         &mut self,
         phone: String,
@@ -198,8 +202,18 @@ mod tests {
     // TESTS HERE
    #[test]
    fn add_customer(){
+    let user = AccountId::new_unchecked("martyminion.testnet".to_string());
+    let mut context = get_context(user.clone());
+    context.block_timestamp(9999);
+
+
     let mut  app = NetOptions::default();
-    app.add_customer("kenn".to_string(), "111".to_string(), "001".to_string(), "21/07/2022".to_string(), "21/08/2022".to_string(), "small".to_owned());
+    app.add_customer(
+        "Andrew".to_string(),
+        "111".to_string(), 
+        "001".to_string(), 
+        "gold".to_owned()
+    );
 
     assert_eq!(app.customers.len(), 1)
    }
@@ -207,9 +221,18 @@ mod tests {
 
    #[test]
    fn update_customer(){
+
+    let user = AccountId::new_unchecked("martyminion.testnet".to_string());
+    let mut context = get_context(user.clone());
+    context.block_timestamp(9999);
+
     let mut  app = NetOptions::default();
     
-    app.add_customer("Joe".to_string(), "111".to_string(), "001".to_string(), "21/07/2022".to_string(), "21/08/2022".to_string(), "bronze".to_owned());
+    app.add_customer(
+        "Joe".to_string(), 
+        "111".to_string(), 
+        "001".to_string(),
+        "bronze".to_owned());
 //update Customer
     app.update_customer_package("111".to_string(),"silver".to_string());
 
